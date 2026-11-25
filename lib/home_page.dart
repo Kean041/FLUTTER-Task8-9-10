@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'auth_service.dart';
 import 'crud_service.dart';
@@ -17,6 +20,7 @@ class _HomePageState extends State<HomePage> {
   final TextEditingController nameCtrl = TextEditingController();
   final TextEditingController qtyCtrl = TextEditingController();
   bool showFavoritesOnly = false;
+  XFile? selectedImage;
 
   Future<void> _signOut() async {
     await AuthService().signOut();
@@ -101,6 +105,28 @@ class _HomePageState extends State<HomePage> {
                     horizontal: 16,
                     vertical: 8,
                   ),
+                  leading: SizedBox(
+                    width: 60,
+                    height: 60,
+                    child: data['image_url'] != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: Image.network(
+                              data['image_url'],
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : Container(
+                            decoration: BoxDecoration(
+                              color: Colors.grey[200],
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Icon(
+                              Icons.image_not_supported,
+                              color: Colors.grey,
+                            ),
+                          ),
+                  ),
                   title: Text(
                     data['name'],
                     style: const TextStyle(
@@ -149,58 +175,97 @@ class _HomePageState extends State<HomePage> {
   void openAddDialog(BuildContext context) {
     nameCtrl.clear();
     qtyCtrl.clear();
+    selectedImage = null;
+
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Add Item'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameCtrl,
-              decoration: InputDecoration(
-                labelText: 'Name',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(8)),
+      builder: (_) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Add Item'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Name',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ), // TextField
+              SizedBox(height: 12),
+              TextField(
+                controller: qtyCtrl,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'Quantity',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ), // TextField
+              SizedBox(height: 12),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  final picked = await ImagePicker().pickImage(
+                    source: ImageSource.gallery,
+                  );
+                  if (picked != null) {
+                    setState(() {
+                      selectedImage = picked;
+                    });
+                  }
+                },
+                icon: const Icon(Icons.image),
+                label: const Text('Pick Image'),
+              ),
+              if (selectedImage != null) ...[
+                const SizedBox(height: 8),
+                Image.file(
+                  File(selectedImage!.path),
+                  height: 100,
+                  width: 100,
+                  fit: BoxFit.cover,
+                ),
+              ],
+            ],
+          ), // Column
+          actions: [
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.pop(context),
+            ), // TextButton
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.teal,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
                 ),
               ),
-            ), // TextField
-            const SizedBox(height: 12),
-            TextField(
-              controller: qtyCtrl,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: 'Quantity',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(8)),
-                ),
-              ),
-            ), // TextField
-          ],
-        ), // Column
-        actions: [
-          TextButton(
-            child: const Text('Cancel'),
-            onPressed: () => Navigator.pop(context),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.teal,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
+              child: const Text('Save'),
+              onPressed: () async {
+                if (nameCtrl.text.isNotEmpty &&
+                    qtyCtrl.text.isNotEmpty &&
+                    int.tryParse(qtyCtrl.text) != null) {
+                  String? imageUrl;
+                  if (selectedImage != null) {
+                    imageUrl = await service.uploadImageToCloudinary(
+                      selectedImage!,
+                    );
+                  }
+                  if (!context.mounted) return;
+                  service.addItem(
+                    nameCtrl.text,
+                    int.parse(qtyCtrl.text),
+                    imageUrl,
+                  );
+                  Navigator.pop(context);
+                }
+              },
             ),
-            child: const Text('Save'),
-            onPressed: () {
-              if (nameCtrl.text.isNotEmpty &&
-                  qtyCtrl.text.isNotEmpty &&
-                  int.tryParse(qtyCtrl.text) != null) {
-                service.addItem(nameCtrl.text, int.parse(qtyCtrl.text));
-                Navigator.pop(context);
-              }
-            },
-          ),
-        ],
+          ],
+        ),
       ),
     ); // AlertDialog
   }

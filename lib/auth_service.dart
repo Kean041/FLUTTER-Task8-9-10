@@ -35,7 +35,7 @@ class AuthService {
       );
       return userCredential.user;
     } catch (e) {
-      print("Registration error: $e");
+      debugPrint("Registration error: $e");
       return null;
     }
   }
@@ -49,7 +49,7 @@ class AuthService {
       );
       return userCredential.user;
     } catch (e) {
-      print("Login error: $e");
+      debugPrint("Login error: $e");
       return null;
     }
   }

@@ -1,23 +1,44 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloudinary_public/cloudinary_public.dart';
+import 'package:image_picker/image_picker.dart';
 
 class CrudService {
   final CollectionReference items = FirebaseFirestore.instance.collection(
     'items',
   );
 
-  Future<void> addItem(String name, int quantity) {
+  final String preset = 'flutter_notes_present';
+
+  Future<void> addItem(String name, int quantity, String? imageUrl) {
     //CREATE
     return items.add({
       'name': name,
       'quantity': quantity,
+      'image_url': imageUrl,
       'isFavorite': false,
-      'createdAt': Timestamp.now(),
+      'created_at': Timestamp.now(),
     });
   }
 
   //READ
   Stream<QuerySnapshot> getItems() {
-    return items.orderBy('createdAt', descending: true).snapshots();
+    return items.orderBy('created_at', descending: true).snapshots();
+  }
+
+  Future<String> uploadImageToCloudinary(XFile pickedFile) async {
+    final cloudinary = CloudinaryPublic(
+      'bbuxio67',
+      preset,
+      cache: false,
+    );
+
+    final response = await cloudinary.uploadFile(
+      CloudinaryFile.fromFile(
+        pickedFile.path,
+        resourceType: CloudinaryResourceType.Image,
+      ),
+    );
+    return response.secureUrl;
   }
 
   //UPDATE
