@@ -20,17 +20,25 @@ class CrudService {
     });
   }
 
+  Future<void> addItemWithImage(
+    String name,
+    int quantity,
+    XFile? pickedFile,
+  ) async {
+    final imageUrl = pickedFile == null
+        ? null
+        : await uploadImageToCloudinary(pickedFile);
+
+    await addItem(name, quantity, imageUrl);
+  }
+
   //READ
   Stream<QuerySnapshot> getItems() {
     return items.orderBy('created_at', descending: true).snapshots();
   }
 
   Future<String> uploadImageToCloudinary(XFile pickedFile) async {
-    final cloudinary = CloudinaryPublic(
-      'bbuxio67',
-      preset,
-      cache: false,
-    );
+    final cloudinary = CloudinaryPublic('bbuxio67', preset, cache: false);
 
     final response = await cloudinary.uploadFile(
       CloudinaryFile.fromFile(

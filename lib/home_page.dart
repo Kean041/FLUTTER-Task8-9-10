@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -21,6 +21,7 @@ class _HomePageState extends State<HomePage> {
   final TextEditingController qtyCtrl = TextEditingController();
   bool showFavoritesOnly = false;
   XFile? selectedImage;
+  Uint8List? selectedImageBytes;
 
   Future<void> _signOut() async {
     await AuthService().signOut();
@@ -100,66 +101,95 @@ class _HomePageState extends State<HomePage> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
                     horizontal: 16,
-                    vertical: 8,
+                    vertical: 12,
                   ),
-                  leading: SizedBox(
-                    width: 60,
-                    height: 60,
-                    child: data['image_url'] != null
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(6),
-                            child: Image.network(
-                              data['image_url'],
-                              fit: BoxFit.cover,
-                            ),
-                          )
-                        : Container(
-                            decoration: BoxDecoration(
-                              color: Colors.grey[200],
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Icon(
-                              Icons.image_not_supported,
-                              color: Colors.grey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(
+                            width: 60,
+                            height: 60,
+                            child: data['image_url'] != null
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: Image.network(
+                                      data['image_url'],
+                                      fit: BoxFit.cover,
+                                    ),
+                                  )
+                                : Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[200],
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: const Icon(
+                                      Icons.image_not_supported,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  data['name'],
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Quantity: ${data['quantity']}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  softWrap: false,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                  ),
-                  title: Text(
-                    data['name'],
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  subtitle: Text(
-                    'Quantity: ${data['quantity']}',
-                    style: const TextStyle(fontSize: 14, color: Colors.grey),
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        tooltip: isFavorite
-                            ? 'Remove from favorites'
-                            : 'Add to favorites',
-                        icon: Icon(
-                          isFavorite ? Icons.favorite : Icons.favorite_border,
-                          color: isFavorite ? Colors.red : Colors.grey,
-                        ),
-                        onPressed: () =>
-                            service.updateFavorite(item.id, !isFavorite),
+                        ],
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.edit, color: Colors.orange),
-                        onPressed: () => openEditDialog(context, item),
-                      ), // IconButton
-                      IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: () => confirmDelete(context, item.id),
-                      ), // IconButton
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          IconButton(
+                            tooltip: isFavorite
+                                ? 'Remove from favorites'
+                                : 'Add to favorites',
+                            icon: Icon(
+                              isFavorite
+                                  ? Icons.favorite
+                                  : Icons.favorite_border,
+                              color: isFavorite ? Colors.red : Colors.grey,
+                            ),
+                            onPressed: () =>
+                                service.updateFavorite(item.id, !isFavorite),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.edit, color: Colors.orange),
+                            onPressed: () => openEditDialog(context, item),
+                          ), // IconButton
+                          IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            onPressed: () => confirmDelete(context, item.id),
+                          ), // IconButton
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -176,6 +206,7 @@ class _HomePageState extends State<HomePage> {
     nameCtrl.clear();
     qtyCtrl.clear();
     selectedImage = null;
+    selectedImageBytes = null;
 
     showDialog(
       context: context,
@@ -206,24 +237,32 @@ class _HomePageState extends State<HomePage> {
                 ),
               ), // TextField
               SizedBox(height: 12),
-              ElevatedButton.icon(
-                onPressed: () async {
-                  final picked = await ImagePicker().pickImage(
-                    source: ImageSource.gallery,
-                  );
-                  if (picked != null) {
-                    setState(() {
-                      selectedImage = picked;
-                    });
-                  }
-                },
-                icon: const Icon(Icons.image),
-                label: const Text('Pick Image'),
+              Wrap(
+                spacing: 8,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      final picked = await ImagePicker().pickImage(
+                        source: ImageSource.gallery,
+                      );
+                      if (picked != null) {
+                        final imageBytes = await picked.readAsBytes();
+                        if (!context.mounted) return;
+                        setState(() {
+                          selectedImage = picked;
+                          selectedImageBytes = imageBytes;
+                        });
+                      }
+                    },
+                    icon: const Icon(Icons.photo_library),
+                    label: const Text('Upload from Device'),
+                  ),
+                ],
               ),
-              if (selectedImage != null) ...[
+              if (selectedImageBytes != null) ...[
                 const SizedBox(height: 8),
-                Image.file(
-                  File(selectedImage!.path),
+                Image.memory(
+                  selectedImageBytes!,
                   height: 100,
                   width: 100,
                   fit: BoxFit.cover,
@@ -248,19 +287,20 @@ class _HomePageState extends State<HomePage> {
                 if (nameCtrl.text.isNotEmpty &&
                     qtyCtrl.text.isNotEmpty &&
                     int.tryParse(qtyCtrl.text) != null) {
-                  String? imageUrl;
-                  if (selectedImage != null) {
-                    imageUrl = await service.uploadImageToCloudinary(
-                      selectedImage!,
+                  try {
+                    await service.addItemWithImage(
+                      nameCtrl.text,
+                      int.parse(qtyCtrl.text),
+                      selectedImage,
+                    );
+                    if (!context.mounted) return;
+                    Navigator.pop(context);
+                  } catch (e) {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Could not save item: $e')),
                     );
                   }
-                  if (!context.mounted) return;
-                  service.addItem(
-                    nameCtrl.text,
-                    int.parse(qtyCtrl.text),
-                    imageUrl,
-                  );
-                  Navigator.pop(context);
                 }
               },
             ),
